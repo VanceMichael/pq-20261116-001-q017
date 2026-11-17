@@ -97,6 +97,8 @@ export function extractLinks(html, baseUrl) {
   });
 }
 
+export const PARSER_VERSION = "feed-html/1.0.0";
+
 export function pageFingerprint(html) {
   return createHashForContent(html);
 }

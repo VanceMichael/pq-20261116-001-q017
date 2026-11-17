@@ -9,10 +9,10 @@ export async function main(args = process.argv.slice(2), env = process.env) {
   const [command, ...parameters] = args;
   if (command === "demo") return runDemo(parameters[0] ?? "fixtures/rolling-feed.html");
   if (command === "serve") return runServer(env);
-  if (new Set(["import", "inspect", "health", "changes", "export", "audit"]).has(command)) {
+  if (new Set(["import", "inspect", "health", "changes", "export", "audit", "reconcile", "replay"]).has(command)) {
     return runArchiveCommand(command, parameters, env);
   }
-  throw new Error("usage: node --experimental-sqlite src/cli.js <demo [html-file] | serve | import <feed> <html> | inspect|health|changes <feed> | export <feed> | audit>");
+  throw new Error("usage: node --experimental-sqlite src/cli.js <demo [html-file] | serve | import <feed> <html> | inspect|health|changes <feed> | export <feed> | audit | reconcile | replay <feed> <capture-id>>");
 }
 
 async function runDemo(filename) {
@@ -49,6 +49,16 @@ async function runArchiveCommand(command, parameters, env) {
       archive.close();
     }
   }
+  if (command === "reconcile") {
+    const archive = new NewsArchive(env.ARCHIVE_DB ?? "./var/archive.sqlite");
+    try {
+      const report = archive.reconcileBlobs();
+      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      return 0;
+    } finally {
+      archive.close();
+    }
+  }
   if (!feedId) throw new TypeError(`${command} requires a feed id`);
   const archive = new NewsArchive(env.ARCHIVE_DB ?? "./var/archive.sqlite");
   try {
@@ -58,6 +68,12 @@ async function runArchiveCommand(command, parameters, env) {
       const result = archive.importSnapshot(feedId, html, capturedAt);
       process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
       return result.accepted ? 0 : 2;
+    }
+    if (command === "replay") {
+      if (!filename) throw new TypeError("replay requires a capture id");
+      const result = archive.replayCapture(feedId, Number(filename));
+      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+      return 0;
     }
     if (command === "inspect") return printResult(archive.feedStatus(feedId));
     if (command === "health") return printResult(archive.feedHealth(feedId));

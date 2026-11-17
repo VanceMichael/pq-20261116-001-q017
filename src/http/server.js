@@ -104,6 +104,26 @@ async function routeRequest(request, response, archive) {
     const result = archive.feedHealth(feedId);
     return result ? writeJson(response, 200, result) : notFound(response);
   }
+  if (segments.length === 6 && segments[3] === "runs" && segments[5] === "source" && request.method === "GET") {
+    const captureId = Number(segments[4]);
+    const source = archive.captureSource(feedId, captureId);
+    const body = Buffer.from(source.html, "utf8");
+    response.writeHead(200, {
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": body.length,
+      "X-Content-Hash": source.contentHash,
+      "X-Parser-Version": source.parserVersion,
+      "X-Byte-Size": String(source.byteSize),
+      "Cache-Control": "no-store"
+    });
+    response.end(body);
+    return;
+  }
+  if (segments.length === 6 && segments[3] === "runs" && segments[5] === "replay" && request.method === "GET") {
+    const captureId = Number(segments[4]);
+    const result = archive.replayCapture(feedId, captureId);
+    return writeJson(response, 200, result);
+  }
   if (segments.length === 6 && segments[3] === "items" && segments[5] === "review") {
     const articleId = Number(segments[4]);
     if (request.method === "PATCH") {

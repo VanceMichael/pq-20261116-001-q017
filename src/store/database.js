@@ -2,7 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { dirname, resolve } from "node:path";
 import { mkdirSync } from "node:fs";
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export function openDatabase(filename) {
   const path = resolve(filename);
@@ -95,6 +95,28 @@ export function migrate(database) {
     PRAGMA user_version = 1;
     COMMIT;
   `);
+  if (version < 2) {
+    database.exec(`
+      BEGIN IMMEDIATE;
+      CREATE TABLE IF NOT EXISTS page_blobs (
+        content_hash TEXT PRIMARY KEY,
+        shard_path TEXT NOT NULL,
+        byte_size INTEGER NOT NULL CHECK(byte_size >= 0),
+        ref_count INTEGER NOT NULL DEFAULT 0 CHECK(ref_count >= 0),
+        stored_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS capture_sources (
+        capture_id INTEGER PRIMARY KEY REFERENCES captures(capture_id),
+        content_hash TEXT NOT NULL REFERENCES page_blobs(content_hash),
+        parser_version TEXT NOT NULL,
+        byte_size INTEGER NOT NULL,
+        stored_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS capture_sources_hash ON capture_sources(content_hash);
+      PRAGMA user_version = 2;
+      COMMIT;
+    `);
+  }
 }
 
 export function closeDatabase(database) {
